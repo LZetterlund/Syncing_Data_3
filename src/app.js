@@ -4,7 +4,7 @@ const fs = require('fs');
 
 const xxh = require('xxhashjs');
 
-const PORT = process.env.PORT || process.env.NODE_PORT || 3010;
+const PORT = process.env.PORT || process.env.NODE_PORT || 3000;
 
 const handler = (req, res) => {
   fs.readFile(`${__dirname}/../client/index.html`, (err, data) => {
@@ -40,16 +40,16 @@ io.on('connection', (sock) => {
   socket.join('room1');
 
   // random x value
-  const xValue = Math.floor((Math.random() * 450)) + 1;
+  const xPosition = Math.floor((Math.random() * 450)) - 50;
 
   socket.square = {
     hash: xxh.h32(`${socket.id}${new Date().getTime()}`, 0xCAFEBABE).toString(16),
     lastUpdate: new Date().getTime(), // last time this object was updated
-    x: xValue, // default x value of this square
+    x: xPosition, // default x value of this square
     y: 0, // default y value of this square
     prevX: 0, // default x value of the last known position
     prevY: 0, // default y value of the last known position
-    destX: xValue, // default x value of the desired next x position
+    destX: xPosition, // default x value of the desired next x position
     destY: 0, // default y value of the desired next y position
     alpha: 0, // default alpha (how far this object is % from prev to dest)
     height: 100, // default height
@@ -61,26 +61,19 @@ io.on('connection', (sock) => {
   // are not the same on both the client and server.
   socket.emit('joined', socket.square);
 
-    // called by client for server to calculate gravity
-  socket.on('gravity', (data) => {
-    socket.square = data;
-
-      // DO GRAVITY
-    if (data.y <= 400) {
-      const gravity = data.destY + 5;
-      socket.square.destY = gravity;
-
-      io.to(socket.id).emit('moveGravity', socket.square);
-    }
-  });
-
   // when we receive a movement update from the client
   socket.on('movementUpdate', (data) => {
     socket.square = data;
+
+    // DO GRAVITY
+    if (data.destY <= 400) {
+      const gravity = data.destY + 5;
+      socket.square.destY = gravity;
+    }
     // we do update the time though, so we know the last time this is updated
     socket.square.lastUpdate = new Date().getTime();
 
-    socket.broadcast.to('room1').emit('updatedMovement', socket.square);
+    io.sockets.in('room1').emit('updatedMovement', socket.square);
   });
 
   // when a user disconnects, we want to make sure we let everyone know
